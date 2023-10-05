@@ -1,9 +1,14 @@
-﻿using MaxiShop.Domain.Contracts;
+﻿using MaxiShop.Application.ApplicationConstants;
+using MaxiShop.Application.Common;
+using MaxiShop.Application.DTO.Category;
+using MaxiShop.Application.Services.Interface;
+using MaxiShop.Domain.Contracts;
 using MaxiShop.Domain.Models;
 using MaxiShop.Infrastructure.DbContexts;
 using MaxiShop.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Net;
 
 namespace MaxiShop.web.Controllers
 {
@@ -11,70 +16,161 @@ namespace MaxiShop.web.Controllers
     [ApiController]
     public class CategoryController : ControllerBase
     {
-        private readonly ICategoryRepository _categoryRepository;
+        private readonly ICategoryService _categoryService;
+        protected APIResponse _response;
 
-        public CategoryController(ICategoryRepository categoryRepository)
+        public CategoryController(ICategoryService categoryService)
         {
-            this._categoryRepository = categoryRepository;
+            this._categoryService = categoryService;
+            _response = new APIResponse();
         }
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult> Get()
+        public async Task<ActionResult<APIResponse>> Get()
         {
-            var categories = await _categoryRepository.GetAllAsync();
-            return Ok(categories);
+            try
+            {
+                var categories = await _categoryService.GetAllAsync();
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Result = categories;
+            }
+            catch (Exception)
+            {
+                _response.StatusCode = HttpStatusCode.InternalServerError;
+                _response.AddError(CommanMessage.SystemError);
+            }
+            
+            return Ok(_response);
         }
 
         [HttpGet]
         [Route("Details")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult> Get(int id)
+        public async Task<ActionResult<APIResponse>> Get(int id)
         {
-            var category = await _categoryRepository.GetByIdAsync(c => c.Id==id);
-            if(category is null)
+            try
             {
-                return NotFound($"Category not found for Id - {id}");
+                var category = await _categoryService.GetByIdAsync(id);
+                if (category is null)
+                {
+                    _response.StatusCode = HttpStatusCode.NotFound;
+                    _response.DisplayMessage = CommanMessage.RecordNotFound;
+                    return _response;
+                }
+                _response.StatusCode = HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Result = category;
             }
-            return Ok(category);
+            catch (Exception)
+            {
+                _response.StatusCode = HttpStatusCode.InternalServerError;
+                _response.AddError(CommanMessage.SystemError);
+            }
+
+            return Ok(_response);
         }
 
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult> Create([FromBody] Category category)
+        public async Task<ActionResult<APIResponse>> Create([FromBody] CreateCategoryDto dto)
         {
-            var entity = await _categoryRepository.CreateAsync(category);
-            return Ok();
+            try
+            {
+                if(!ModelState.IsValid)
+                {
+                    _response.StatusCode =HttpStatusCode.BadRequest;
+                    _response.DisplayMessage = CommanMessage.CreateOperationFailed;
+                    _response.AddError(ModelState.ToString());
+                    return _response;
+                }
+            
+                var entity = await _categoryService.CreateAsync(dto);
+                _response.StatusCode = HttpStatusCode.Created;
+                _response.IsSuccess = true;
+                _response.DisplayMessage = CommanMessage.CreateOperationSuccess;
+                _response.Result = entity;
+
+            }
+            catch(Exception)
+            {
+                _response.StatusCode = HttpStatusCode.InternalServerError;
+                _response.DisplayMessage = CommanMessage.CreateOperationFailed;
+                _response.AddError(CommanMessage.SystemError);
+            }
+            
+            return Ok(_response);
         }
 
         [HttpPut]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult> Update([FromBody] Category category)
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<ActionResult<APIResponse>> Update([FromBody] UpdateCategoryDto dto)
         {
-            await _categoryRepository.UpdateAsync(category);
-            return NoContent();
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    _response.StatusCode = HttpStatusCode.BadRequest;
+                    _response.DisplayMessage = CommanMessage.UpdateOperationFailed;
+                    _response.AddError(ModelState.ToString());
+                    return _response;
+                }
+                var category = await _categoryService.GetByIdAsync(dto.Id);
+                if(category==null)
+                {
+                    _response.StatusCode = HttpStatusCode.NotFound;
+                    _response.DisplayMessage = CommanMessage.UpdateOperationFailed;
+                    return _response;
+                }
+                await _categoryService.UpdateAsync(dto);
+                _response.StatusCode = HttpStatusCode.NoContent;
+                _response.IsSuccess = true;
+                _response.DisplayMessage = CommanMessage.UpdateOperationSuccess;
+            }
+            catch(Exception)
+            {
+                _response.StatusCode = HttpStatusCode.InternalServerError;
+                _response.DisplayMessage = CommanMessage.UpdateOperationFailed;
+                _response.AddError(CommanMessage.SystemError);
+            }
+            
+            return Ok(_response);
         }
 
 
         [HttpDelete]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult> Delete(int id)
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<ActionResult<APIResponse>> Delete(int id)
         {
-            if (id <= 0)
-                return BadRequest();
-            var category = await _categoryRepository.GetByIdAsync(c => c.Id==id);
-            if(category is null)
+            try
             {
-                return NotFound();
+                if (id <= 0)
+                {
+                    _response.StatusCode = HttpStatusCode.BadRequest;
+                    _response.DisplayMessage = CommanMessage.DeletedOperationFailed;
+                    return _response;
+                }
+                var category = await _categoryService.GetByIdAsync(id);
+                if (category is null)
+                {
+                    _response.StatusCode = HttpStatusCode.NotFound;
+                    _response.DisplayMessage = CommanMessage.DeletedOperationFailed;
+                    return _response;
+                }
+                await _categoryService.DeleteAsync(id);
+                _response.StatusCode = HttpStatusCode.NoContent;
+                _response.DisplayMessage = CommanMessage.DeleteOperationSuccess;
+                _response.AddError(ModelState.ToString());
             }
-            await _categoryRepository.DeleteAsync(category);
-            return NoContent();
+            catch(Exception)
+            {
+                _response.StatusCode = HttpStatusCode.InternalServerError;
+                _response.DisplayMessage = CommanMessage.DeletedOperationFailed;
+                _response.AddError(CommanMessage.SystemError);
+            }
+           
+            return Ok(_response);
         }
     }
 }

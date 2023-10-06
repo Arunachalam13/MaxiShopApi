@@ -5,13 +5,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MaxiShop.Application.DTO.Category
+namespace MaxiShop.Application.DTO.Brand
 {
-    public class CategoryDto
+    public class BrandDto
     {
-        
         public int Id { get; set; }
         
         public string Name { get; set; }
+        
+        public int EstablishedYear { get; set; }
     }
 }

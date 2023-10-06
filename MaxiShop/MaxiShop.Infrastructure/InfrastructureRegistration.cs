@@ -16,6 +16,7 @@ namespace MaxiShop.Infrastructure
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             //services.AddScoped(typeof(ICategoryRepository), typeof(CategoryRepository));
             services.AddScoped<ICategoryRepository, CategoryRepository>();
+            services.AddScoped<IBrandRepository, BrandRepository>();
             return services;
         }
     }
